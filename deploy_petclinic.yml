@@ -1,0 +1,54 @@
+- name: Deploy Spring Petclinic Application
+  hosts: app_servers
+  become: yes
+  vars_files:
+    - sudo_password.yml
+  vars:
+    docker_image: 'spring-petclinic:1.0.0'
+    docker_image_path: /Users/mfotache/spring-petclinic-1.0.0.tar 
+
+  tasks:
+    - name: Install Docker
+      yum:
+        name: docker
+        state: present
+
+    - name: Ensure docker group exists
+      group:
+        name: docker
+        state: present
+
+    - name: Add cloud_user to docker group
+      user:
+        name: cloud_user
+        groups: docker
+        append: yes
+      notify: restart docker
+
+    - name: Start and enable Docker service
+      service: 
+        name: docker
+        state: started
+        enabled: yes
+    
+    - name: Load Docker image from local tar file
+      copy:
+        src: "{{ docker_image_path }}"
+        dest: "/tmp/spring-petclinic-1.0.0.tar"
+   
+    - name: Import Docker image
+      shell: "docker load < /tmp/spring-petclinic-1.0.0.tar"
+   
+    - name: Run Docker-based application
+      docker_container:
+        name: spring-petclinic
+        image: "{{ docker_image }}"
+        state: started
+        published_ports:
+          - "8080:8080"
+
+  handlers:
+    - name: restart docker
+      service:
+        name: docker
+        state: restarted
